@@ -1,0 +1,36 @@
+[Unit]
+Description=Routes to external lab network
+After=network.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=true
+
+{% for host in groups['loadbalancer'] %}
+ExecStartPre=-/usr/bin/env ip route del 10.20.30.0/24 via {{ hostvars[host].vxlan_address.split('/')[0] }}
+{% endfor %}
+ExecStartPre=-/usr/bin/env ip link del extnet_vxlan
+
+ExecStart=/usr/bin/env ip link add extnet_vxlan type vxlan id 1337 dstport 1337 local {{ ansible_default_ipv4.address }}
+ExecStart=/usr/bin/env ip link set extnet_vxlan up
+ExecStart=/usr/bin/env ip address add {{ vxlan_address }} dev extnet_vxlan
+
+{% for host in groups['all'] %}
+{% if inventory_hostname != host %}
+ExecStart=/usr/bin/env bridge fdb append 00:00:00:00:00:00 dev extnet_vxlan dst {{ hostvars[host].ansible_default_ipv4.address }}
+{% endif %}
+{% endfor %}
+
+{% if inventory_hostname not in groups['loadbalancer'] %}
+{% for host in groups['loadbalancer'] %}
+ExecStart=/usr/bin/env ip route add 10.20.30.0/24 via {{ hostvars[host].vxlan_address.split('/')[0] }}
+{% endfor %}
+{% endif %}
+
+{% for host in groups['loadbalancer'] %}
+ExecStop=-/usr/bin/env ip route del 10.20.30.0/24 via {{ hostvars[host].vxlan_address.split('/')[0] }}
+{% endfor %}
+ExecStop=-/usr/bin/env ip link del extnet_vxlan
+
+[Install]
+WantedBy=multi-user.target

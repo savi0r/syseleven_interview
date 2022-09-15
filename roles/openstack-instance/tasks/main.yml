@@ -1,0 +1,22 @@
+---
+
+- name: Provision instance
+  include_tasks: provision.yml
+
+- name: Install python for ansible
+  include_tasks: python.yml
+  when:
+    - os_provisioned_instance is changed
+    - openstack_instance_install_python|bool
+
+- name: Gather facts
+  setup:
+  when:
+    - os_provisioned_instance is changed
+    - openstack_instance_gather_facts|bool
+
+- name: Perform full operating system upgrade
+  include_tasks: upgrade.yml
+  when:
+    - os_provisioned_instance is changed
+    - openstack_instance_perform_full_upgrade|bool

@@ -1,0 +1,31 @@
+---
+
+- name: Install bridge-utils
+  apt:
+    name: bridge-utils
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Deploy service file
+  template:
+    src: "extnet.service.j2"
+    dest: "/etc/systemd/system/extnet.service"
+  register: extnet_service
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: True
+  when: extnet_service.changed
+
+- name: Enable extnet service
+  systemd:
+    name: extnet.service
+    enabled: True
+
+- name: Restart extnet service
+  systemd:
+    name: extnet.service
+    state: restarted
+  when: extnet_service.changed

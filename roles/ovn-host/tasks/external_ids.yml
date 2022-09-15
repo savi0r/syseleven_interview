@@ -1,0 +1,18 @@
+---
+
+- name: Get configured value for {{ avpair.option }}
+  command: >
+    ovs-vsctl get open . external-ids:{{ avpair.option }}
+  changed_when: False
+  failed_when: >
+    value.rc != 0 and
+    not (value.rc == 1 and "no key" in value.stderr)
+  register: value
+  check_mode: False
+
+- name: Set new value for {{ avpair.option }}
+  command: >
+    ovs-vsctl set open . external-ids:{{ avpair.option }}={{ avpair.value }}
+  when: >
+    value.rc == 1 or value.stdout != avpair.value
+  notify: restart ovn-host

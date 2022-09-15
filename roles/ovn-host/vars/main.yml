@@ -1,0 +1,26 @@
+---
+
+external_ids_config_common:
+  - option: "ovn-remote"
+    value: >-
+      "{% for host in groups['controller'] %}tcp:{{ hostvars[host].ansible_default_ipv4.address }}:6642{% if not loop.last %},{% endif %}{% endfor %}"
+  - option: "ovn-nb"
+    value: >-
+      "{% for host in groups['controller'] %}tcp:{{ hostvars[host].ansible_default_ipv4.address }}:6641{% if not loop.last %},{% endif %}{% endfor %}"
+  - option: "ovn-encap-type"
+    value: >-
+      geneve
+  - option: "ovn-encap-ip"
+    value: >-
+      "{{ ansible_default_ipv4.address }}"
+  - option: "hostname"
+    value: >-
+      {{ inventory_hostname.split(".")[0] }}
+  - option: "ovn-bridge-mappings"
+    value: >-
+      "provider:br-provider"
+
+external_ids_config_gateway:
+  - option: "ovn-cms-options"
+    value: >-
+      enable-chassis-as-gw

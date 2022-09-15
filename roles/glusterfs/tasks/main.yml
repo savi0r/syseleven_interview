@@ -1,0 +1,60 @@
+---
+
+- name: Install GlusterFS packages
+  apt:
+    name:
+      - glusterfs-client
+      - glusterfs-server
+      - glusterfs-common
+      - rpcbind
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Create brick directory
+  file:
+    path: "{{ glusterfs_bricks_path }}"
+    state: directory
+
+- name: Create mount directory
+  file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.uid }}"
+    group: "{{ item.gid }}"
+  loop: "{{ glusterfs_volumes }}"
+
+- name: Enable and start GlusterFS
+  systemd:
+    name: glusterd.service
+    state: started
+    enabled: True
+
+- name: Create a trusted storage pool
+  gluster_peer:
+        nodes: "{{ glusterfs_nodes | difference([inventory_hostname])}}"
+  run_once: True
+
+- name: Create volumes
+  gluster_volume:
+    state: present
+    name: "{{ item.name }}"
+    bricks: "{{ glusterfs_bricks_path }}/{{ item.name }}"
+    rebalance: yes
+    cluster: "{{ item.cluster }}"
+    force: True
+    options:
+      storage.owner-uid: "{{ item.uid }}"
+      storage.owner-gid: "{{ item.gid }}"
+  run_once: True
+  loop: "{{ glusterfs_volumes }}"
+
+- name: Mount gluster volumes
+  mount:
+    name: "{{ item.path }}"
+    src: "localhost:/{{ item.name }}"
+    fstype: glusterfs
+    opts: "defaults,_netdev"
+    state: mounted
+  loop: "{{ glusterfs_volumes }}"

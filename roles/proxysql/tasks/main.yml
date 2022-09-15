@@ -1,0 +1,41 @@
+---
+
+- name: Add ProxySQL apt key
+  apt_key:
+    url: "https://repo.proxysql.com/ProxySQL/repo_pub_key"
+    state: present
+
+- name: Add ProxySQL repo
+  apt_repository:
+    repo: "deb https://repo.proxysql.com/ProxySQL/proxysql-2.0.x/bionic/ ./"
+    state: present
+
+- name: Install ProxySQL
+  apt:
+    name: proxysql
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Configure ProxySQL
+  template:
+    src: "proxysql.cnf.j2"
+    dest: "/etc/proxysql.cnf"
+  register: proxysql_config
+
+- name: Create ProxySQL database user (in Galera cluster)
+  mysql_user:
+    name: "{{ proxysql_monitor_username }}"
+    host: "%"
+    password: "{{ proxysql_monitor_password }}"
+    priv: "*.*:SELECT,SHOW VIEW,PROCESS"
+    login_unix_socket: "/var/run/mysqld/mysqld.sock"
+    state: present
+  run_once: True
+
+- name: Restart ProxySQL
+  systemd:
+    name: proxysql.service
+    state: restarted
+  when: proxysql_config.changed

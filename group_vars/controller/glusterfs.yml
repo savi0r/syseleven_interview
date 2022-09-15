@@ -1,0 +1,10 @@
+---
+
+glusterfs_nodes: "{{ groups['controller'] }}"
+
+glusterfs_volumes:
+  - name: "images"
+    path: "/var/lib/glance/images"
+    cluster: "{{ glusterfs_nodes }}"
+    uid: 64062
+    gid: 64062

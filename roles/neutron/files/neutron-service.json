@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "neutron",
+        "checks": [{
+            "id": "neutron port check",
+            "http": "http://localhost:9696/",
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

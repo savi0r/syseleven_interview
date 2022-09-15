@@ -1,0 +1,11 @@
+[Unit]
+Description=Consul Agent
+
+[Service]
+User=root
+Restart=always
+ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
+ExecReload=/bin/kill -HUP $MAINPID
+
+[Install]
+WantedBy=multi-user.target

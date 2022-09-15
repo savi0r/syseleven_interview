@@ -1,0 +1,48 @@
+---
+
+- name: Install nova compute packages
+  apt:
+    name:
+      - libguestfs-tools
+      - nova-compute
+      - qemu-system
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Setup nova.conf
+  template:
+    src: "nova.conf.j2"
+    dest: "/etc/nova/nova.conf"
+  register: nova_configuration
+
+- name: Setup nova-compute.conf
+  copy:
+    src: "nova-compute.conf"
+    dest: "/etc/nova/nova-compute.conf"
+  register: nova_compute_configuration
+
+- name: Copy libvirtd configuration file
+  copy:
+    src: "libvirtd.conf"
+    dest: "/etc/libvirt/libvirtd.conf"
+  register: libvirtd_conf
+
+- name: Copy libvirtd defaults
+  copy:
+    src: "libvirtd"
+    dest: "/etc/default/libvirtd"
+  register: libvirtd_default
+
+- name: Restart libvirtd
+  systemd:
+    name: libvirtd.service
+    state: restarted
+  when: libvirtd_conf.changed or libvirtd_default.changed
+
+- name: Restart nova-compute service
+  systemd:
+    name: nova-compute.service
+    state: restarted
+  when: nova_configuration.changed or nova_compute_configuration.changed

@@ -1,0 +1,4 @@
+# OVN_CTL_OPTS: Extra options to pass to ovn-ctl. This is, for example,
+# a suitable place to specify --ovn-northd-wrapper=valgrind.
+
+OVN_CTL_OPTS="--db-sb-sync-from-addr={% for host in groups['controller'] %}tcp:{{ hostvars[host].ansible_default_ipv4.address }}:6642{% if not loop.last %},{% endif %}{% endfor %}"

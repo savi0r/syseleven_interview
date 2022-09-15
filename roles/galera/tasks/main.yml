@@ -1,0 +1,54 @@
+---
+
+- name: Add MariaDB apt key
+  apt_key:
+    keyserver: "keyserver.ubuntu.com"
+    id: "{{ mariadb_apt_key }}"
+
+- name: Add MariaDB apt repository
+  apt_repository:
+    repo: "{{ mariadb_apt_repo }}"
+    state: present
+
+- name: Install MariaDB and Galera packages
+  apt:
+    name:
+      - galera-4
+      - mariadb-server
+      - python3-mysqldb
+      - python3-pymysql
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Configure Galera cluster
+  template:
+    src: "{{ item }}.j2"
+    dest: "/etc/mysql/conf.d/{{ item }}"
+  register: galera_configuration
+  loop:
+    - "galera.cnf"
+    - "mysqld.cnf"
+
+- name: Get existing cluster size
+  shell: >
+    mysql -e "show global status like 'wsrep_cluster_size';" -NLB |
+    awk '{ print $2 }'
+  register: galera_cluster_size
+  ignore_errors: True
+  changed_when: False
+
+- name: Bootstrap Galera cluster
+  include_tasks: bootstrap.yml
+  when:
+    - galera_cluster_size.failed or galera_cluster_size.stdout|trim != "3"
+
+- name: Apply new MariaDB configuration
+  systemd:
+    name: mariadb
+    state: restarted
+  when:
+    - galera_configuration.changed
+    - galera_cluster_size.stdout|trim == "3"
+    - not galera_cluster_size.failed

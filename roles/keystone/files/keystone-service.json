@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "keystone",
+        "checks": [{
+            "id": "keystone port check",
+            "http": "http://localhost:5000/v3",
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

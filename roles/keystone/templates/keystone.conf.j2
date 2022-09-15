@@ -1,0 +1,13 @@
+#jinja2: trim_blocks:False
+[DEFAULT]
+log_dir = /var/log/keystone
+
+[database]
+connection = "mysql+pymysql://{{ database_credentials.keystone.username }}:{{ database_credentials.keystone.password }}@localhost:6033/{{ database_credentials.keystone.dbname }}"
+
+[token]
+provider = "fernet"
+
+[cache]
+backend = oslo_cache.memcache_pool
+memcache_servers = {% for host in groups['controller'] %}{{ host }}:11211{{ "," if not loop.last else "" }}{% endfor %}

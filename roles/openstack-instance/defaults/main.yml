@@ -1,0 +1,19 @@
+---
+
+# These values have to be overriden
+openstack_instance_flavor: ""
+openstack_instance_image: ""
+openstack_instance_key_name: ""
+openstack_instance_network: ""
+openstack_instance_security_groups: []
+
+# Set region if required
+#openstack_instance_region_name: ""
+
+# These vaules can be overriden if required
+openstack_instance_default_user: "ubuntu"
+openstack_instance_gather_facts: True
+openstack_instance_install_python: True
+openstack_instance_name: "{{ inventory_hostname }}"
+openstack_instance_perform_full_upgrade: True
+openstack_instance_public_ip: False

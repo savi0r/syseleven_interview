@@ -1,0 +1,4 @@
+---
+
+mariadb_apt_key: "0xF1656F24C74CD1D8"
+mariadb_apt_repo: "deb http://mirror2.hs-esslingen.de/mariadb/repo/10.4/ubuntu bionic main"

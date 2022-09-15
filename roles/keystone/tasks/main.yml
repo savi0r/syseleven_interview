@@ -1,0 +1,103 @@
+---
+
+- name: Install keystone packages
+  apt:
+    name:
+      - keystone
+      - python3-openstacksdk
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Configure default Apache ServerName
+  lineinfile:
+    path: "/etc/apache2/apache.conf"
+    line: "ServerName {{ inventory_hostname }}"
+    regex: "^ServerName"
+    create: True
+  register: apache_configuration
+
+- name: Setup keystone.conf
+  template:
+    src: "keystone.conf.j2"
+    dest: "/etc/keystone/keystone.conf"
+  register: keystone_configuration
+
+- name: Setup keystone virtual site
+  copy:
+    src: "keystone-site.conf"
+    dest: "/etc/apache2/sites-available/keystone.conf"
+  register: keystone_site_configuration
+
+- name: Create keystone database user
+  mysql_user:
+    name: "{{ database_credentials.keystone.username }}"
+    host: "%"
+    password: "{{ database_credentials.keystone.password }}"
+    priv: "{{ database_credentials.keystone.dbname }}.*:ALL,GRANT"
+    login_unix_socket: "/var/run/mysqld/mysqld.sock"
+    state: present
+  run_once: True
+
+- name: Create keystone database
+  mysql_db:
+    login_host: "127.0.0.1"
+    login_port: 6033
+    login_user: "{{ database_credentials.keystone.username }}"
+    login_password: "{{ database_credentials.keystone.password }}"
+    name: "{{ database_credentials.keystone.dbname }}"
+    state: present
+  run_once: True
+  register: keystone_database
+
+- name: Bootstrap keystone
+  include_tasks: bootstrap.yml
+  when: keystone_database.changed
+
+- name: Restart apache2
+  systemd:
+    name: apache2
+    state: restarted
+  when: 
+    - apache_configuration.changed or keystone_configuration.changed or keystone_database.changed or keystone_site_configuration.changed
+
+- name: Install keystone Consul service
+  copy:
+    src: "keystone-service.json"
+    dest: "/etc/consul.d/keystone-service.json"
+  register: keystone_consul_service
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: keystone_consul_service.changed
+
+- name: Give 15 seconds for Consul service to pass all health checks
+  pause:
+    seconds: 15
+  when: 
+    - apache_configuration.changed or keystone_configuration.changed or keystone_database.changed
+
+- name: Create admin project
+  os_project:
+    cloud: "{{ openstack_cloud_name }}"
+    name: admin
+    state: present
+    description: "Admin Project"
+    domain_id: default
+    endpoint_type: internal
+    enabled: True
+  run_once: True
+
+- name: Create service project
+  os_project:
+    cloud: "{{ openstack_cloud_name }}"
+    name: service
+    state: present
+    description: "Service Project"
+    domain_id: default
+    endpoint_type: internal
+    enabled: True
+  run_once: True

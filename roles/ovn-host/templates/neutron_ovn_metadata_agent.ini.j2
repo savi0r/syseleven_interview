@@ -1,0 +1,12 @@
+[DEFAULT]
+nova_metadata_host = localhost
+nova_metadata_port = {{ services.metadata.frontend_port }}
+nova_metadata_protocol = "http"
+metadata_proxy_shared_secret = {{ openstack_credentials.nova.metadata }}
+metadata_workers = 1
+
+[ovs]
+ovsdb_connection="unix:/var/run/openvswitch/db.sock"
+
+[ovn]
+ovn_sb_connection = {% for host in groups['controller'] %}tcp:{{ hostvars[host].ansible_default_ipv4.address }}:6642{% if not loop.last %},{% endif %}{% endfor %}

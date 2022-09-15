@@ -1,0 +1,44 @@
+---
+
+- name: Run keystone database migrations
+  become_user: keystone
+  command: >
+    /usr/bin/keystone-manage db_sync
+  run_once: True
+
+- name: Create fernet key directory
+  file:
+    dest: "/etc/keystone/fernet-keys"
+    mode: 0700
+    owner: keystone
+    group: keystone
+    state: directory
+
+- name: Copy fernet keys
+  copy:
+    content: "{{ item.value }}"
+    dest: "/etc/keystone/fernet-keys/{{ item.key }}"
+    mode: 0600
+    owner: keystone
+    group: keystone
+  loop: "{{ fernet_keys|dict2items }}"
+
+- name: Fernet key credential_setup
+  become_user: keystone
+  command: >
+    /usr/bin/keystone-manage credential_setup --keystone-user keystone --keystone-group keystone
+
+- name: Bootstrap keystone default domain, region and admin user
+  become_user: keystone
+  command: >
+    keystone-manage bootstrap \
+    --bootstrap-password "{{ openstack_credentials.admin.password }}" \
+    --bootstrap-username "{{ openstack_credentials.admin.username }}" \
+    --bootstrap-project-name admin \
+    --bootstrap-role-name admin \
+    --bootstrap-service-name keystone \
+    --bootstrap-region-id {{ openstack_region_name }} \
+    --bootstrap-admin-url "{{ openstack_endpoints.keystone.admin }}" \
+    --bootstrap-public-url "{{ openstack_endpoints.keystone.public }}" \
+    --bootstrap-internal-url "{{ openstack_endpoints.keystone.internal }}"
+  run_once: True

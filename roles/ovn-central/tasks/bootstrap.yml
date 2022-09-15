@@ -1,0 +1,29 @@
+- name: Stop ovn-central everywhere
+  systemd:
+    name: ovn-central.service
+    state: stopped
+
+- name: Remove current database state
+  file:
+    path: "/var/lib/ovn"
+    state: absent
+
+- name: Create empty database state
+  file:
+    path: "/var/lib/ovn"
+    state: directory
+
+- name: Start ovn-central on the first controller
+  systemd:
+    name: ovn-central.service
+    state: started
+  when: inventory_hostname == groups['controller'][0]
+
+- name: Give 10 seconds for the first controller to boot
+  wait_for:
+    timeout: 30
+
+- name: Start ovn-central everywhere
+  systemd:
+    name: ovn-central.service
+    state: started

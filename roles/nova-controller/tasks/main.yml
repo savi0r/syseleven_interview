@@ -1,0 +1,159 @@
+---
+
+- name: Install nova api packages
+  apt:
+    name:
+      - nova-api
+      - nova-conductor
+      - nova-scheduler
+      - nova-spiceproxy
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Configure nova
+  template:
+    src: "nova.conf.j2"
+    dest: "/etc/nova/nova.conf"
+  register: nova_configuration
+
+- name: Create nova database user and set permissions
+  mysql_user:
+    name: "{{ database_credentials.nova.username }}"
+    host: "%"
+    password: "{{ database_credentials.nova.password }}"
+    priv: "{{ item }}.*:ALL,GRANT"
+    login_unix_socket: "/var/run/mysqld/mysqld.sock"
+    append_privs: True
+    state: present
+  run_once: True
+  loop:
+    - "{{ database_credentials.nova.dbname }}"
+    - "{{ database_credentials.nova.dbname_api }}"
+    - nova_cell0
+
+- name: Create nova databases
+  mysql_db:
+    login_host: localhost
+    login_port: "6033"
+    login_user: "{{ database_credentials.nova.username }}"
+    login_password: "{{ database_credentials.nova.password }}"
+    name: "{{ item }}"
+    state: present
+  register: nova_database
+  run_once: True
+  loop:
+    - "{{ database_credentials.nova.dbname }}"
+    - "{{ database_credentials.nova.dbname_api }}"
+    - nova_cell0
+
+- name: Create nova OpenStack service user
+  os_user:
+    cloud: "{{ openstack_cloud_name }}"
+    region_name: "{{ openstack_region_name }}"
+    name: "{{ openstack_credentials.nova.username }}"
+    password: "{{ openstack_credentials.nova.password }}"
+    domain: default
+    default_project: service
+  run_once: True
+
+- name: Set admin role for nova user in service project
+  os_user_role:
+    cloud: "{{ openstack_cloud_name }}"
+    user: nova
+    role: admin
+    project: service
+  run_once: True
+
+- name: Create nova service entry
+  os_keystone_service:
+    cloud: "{{ openstack_cloud_name }}"
+    state: present
+    name: nova
+    service_type: compute
+    description: "Compute Service"
+  run_once: True
+
+- name: Create public service endpoint for nova
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: nova
+    endpoint_interface: public
+    url: "{{ openstack_endpoints.nova.public }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create internal service endpoint for nova
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: nova
+    endpoint_interface: internal
+    url: "{{ openstack_endpoints.nova.internal }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create admin service endpoint for nova
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: nova
+    endpoint_interface: admin
+    url: "{{ openstack_endpoints.nova.admin }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Bootstrap nova
+  become_user: nova
+  when: nova_database is changed
+  run_once: True
+  block:
+    - name: Populate nova-api database
+      command: >
+        /usr/bin/nova-manage api_db sync
+    - name: Register the cell0 database
+      command: >
+        /usr/bin/nova-manage cell_v2 map_cell0
+    - name: Create cell1
+      command: >
+        /usr/bin/nova-manage cell_v2 create_cell --name=cell1 --verbose
+    - name: Populate the nova database
+      command: >
+        /usr/bin/nova-manage db sync
+
+- name: Restart nova services
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - nova-api.service
+    - nova-scheduler.service
+    - nova-conductor.service
+    - nova-spiceproxy.service
+  when: nova_configuration.changed or nova_database.changed
+
+- name: Install nova Consul service
+  copy:
+    src: "{{ item }}"
+    dest: "/etc/consul.d/{{ item }}"
+  loop:
+    - "nova-service.json"
+    - "nova-metadata-service.json"
+  register: nova_consul_services
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: nova_consul_services.changed
+
+- name: Configure nova flavors
+  run_once: True
+  block:
+    - name: Give 15 seconds for Consul service to pass all health checks
+      when: nova_database is changed
+      pause:
+        seconds: 15
+    - include_tasks: flavors.yml

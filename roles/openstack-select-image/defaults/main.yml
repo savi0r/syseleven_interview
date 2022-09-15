@@ -1,0 +1,20 @@
+---
+
+# Configure desired constains. All of these must match, in order for image to
+# enter resulting image list. After the role is executed, all images that
+# match these constains will be available in openstack_selected_images list.
+#
+# field, operation and value will be used in selectattr() jinja2 filter like this:
+# selectattr(field, operation, value)
+
+# For example, to get list of Ubuntu Bionic images:
+
+# openstack_image_constrains:
+#   - field: os_distro
+#     operation: match
+#     value: ubuntu
+#   - field: os_version
+#     operation: match
+#     value: '18.04'
+
+openstack_image_constrains: {}

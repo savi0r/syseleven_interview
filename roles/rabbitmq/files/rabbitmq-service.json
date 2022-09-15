@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "rabbitmq",
+        "checks": [{
+            "id": "rabbitmq cluster health",
+            "args": ["rabbitmqctl", "cluster_status"],
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

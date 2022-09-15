@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "cinder",
+        "checks": [{
+            "id": "cinder port check",
+            "http": "http://localhost:8776/",
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

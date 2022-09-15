@@ -1,0 +1,52 @@
+---
+
+- name: Install Open vSwitch OVSDB and OVN components
+  apt:
+    name:
+      - openvswitch-common
+      - openvswitch-switch
+      - ovn-central
+      - ovn-common
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Template OVN central defaults file
+  template:
+    src: "ovn-central.j2"
+    dest: "/etc/default/ovn-central"
+  register: ovn_central
+
+- name: Ensure that ovn-central service is enabled
+  systemd:
+    name: ovn-central.service
+    enabled: True
+
+- name: Get the status of nortbound database cluster
+  shell: >
+    ovs-appctl -t /var/run/ovn/ovnnb_db.ctl cluster/status OVN_Northbound |
+    grep Servers -A 3 |
+    wc -l
+  changed_when: False
+  register: nb_cluster_status
+  failed_when: False
+
+- name: Get the status of southbound database cluster
+  shell: >
+    ovs-appctl -t /var/run/ovn/ovnsb_db.ctl cluster/status OVN_Southbound |
+    grep Servers -A 3 |
+    wc -l
+  changed_when: False
+  register: sb_cluster_status
+  failed_when: False
+
+- name: Bootstrap OVSDB cluster
+  include_tasks: bootstrap.yml
+  when: 'nb_cluster_status.stdout|trim != "4" or sb_cluster_status.stdout|trim != "4"'
+
+- name: Restart ovn-central when needed
+  systemd:
+    name: ovn-central.service
+    state: restarted
+  when: ovn_central.changed

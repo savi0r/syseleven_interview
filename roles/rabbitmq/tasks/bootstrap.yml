@@ -1,0 +1,19 @@
+---
+
+- name: Stop RabbitMQ app
+  command: "rabbitmqctl stop_app"
+
+- name: Reset RabbitMQ app
+  command: "rabbitmqctl force_reset"
+
+- name: Start RabbitMQ app on master node
+  command: "rabbitmqctl start_app"
+  when: inventory_hostname == groups['controller'][0]
+
+- name: Join RabbitMQ cluster on slave nodes
+  command: "rabbitmqctl join_cluster rabbit@{{ groups['controller'][0].split('.')[0] }}"
+  when: inventory_hostname != groups['controller'][0]
+
+- name: Start RabbitMQ app on slave nodes
+  command: "rabbitmqctl start_app"
+  when: inventory_hostname != groups['controller'][0]

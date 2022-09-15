@@ -1,0 +1,3 @@
+{% for host in groups['compute'] %}
+{{ host }}:instances
+{% endfor %}

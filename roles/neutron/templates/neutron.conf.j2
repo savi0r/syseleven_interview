@@ -1,0 +1,36 @@
+#jinja2: trim_blocks:False
+[DEFAULT]
+transport_url = rabbit://{{ rabbitmq_username}}:{{ rabbitmq_password }}@localhost:{{ services.rabbitmq.frontend_port }}
+core_plugin = neutron.plugins.ml2.plugin.Ml2Plugin
+service_plugins = neutron.services.ovn_l3.plugin.OVNL3RouterPlugin
+allow_overlapping_ips = true
+auth_strategy = keystone
+notify_nova_on_port_status_changes = true
+notify_nova_on_port_data_changes = true
+dhcp_agent_notification = false
+
+[database]
+connection = "mysql+pymysql://{{ database_credentials.neutron.username }}:{{ database_credentials.neutron.password }}@localhost:6033/{{ database_credentials.neutron.dbname }}"
+
+[keystone_authtoken]
+www_authenticate_uri = {{ openstack_endpoints.keystone.public }}
+auth_url = {{ openstack_endpoints.keystone.internal }}
+memcached_servers = {% for host in groups['controller'] %}{{ host }}:11211{{ "," if not loop.last else "" }}{% endfor %}
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = {{ openstack_credentials.neutron.username }}
+password = {{ openstack_credentials.neutron.password }}
+
+[nova]
+auth_url = {{ openstack_endpoints.keystone.internal }}
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = {{ openstack_credentials.nova.username }}
+password = {{ openstack_credentials.nova.password }}
+
+[oslo_concurrency]
+lock_path = /var/lib/neutron/tmp

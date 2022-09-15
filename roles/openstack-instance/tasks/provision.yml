@@ -1,0 +1,46 @@
+---
+
+- name: Provision machine in cloud
+  connection: local
+  delegate_to: localhost
+  become: False
+  os_server:
+    name: "{{ openstack_instance_name }}"
+    image: "{{ openstack_instance_image }}"
+    flavor: "{{ openstack_instance_flavor }}"
+    key_name: "{{ openstack_instance_key_name }}"
+    network: "{{ openstack_instance_network }}"
+    auto_ip: "{{ openstack_instance_public_ip }}"
+    security_groups: "{{ openstack_instance_security_groups }}"
+    region_name: "{{ openstack_instance_region_name | default(omit) }}"
+  register: os_provisioned_instance
+
+- name: Update ansible host ip address to public ip address
+  set_fact:
+    ansible_host: "{{ os_provisioned_instance.server.public_v4 }}"
+  when: os_provisioned_instance.server.public_v4 != ""
+
+- name: Update ansible host ip address to private ip address
+  set_fact:
+    ansible_host: "{{ os_provisioned_instance.server.private_v4 }}"
+  when: os_provisioned_instance.server.public_v4 == ""
+
+- name: Update ansible ssh user to default if server was created
+  set_fact:
+    ansible_user: "{{ openstack_instance_default_user }}"
+  when: os_provisioned_instance is changed
+
+- name: Wait for ssh to become active on provisioned instance
+  wait_for:
+    port: "{{ ansible_port | default(22) }}"
+    host: "{{ ansible_host }}"
+  delegate_to: localhost
+  become: False
+  when: os_provisioned_instance is changed
+
+- name: Give 5 seconds for instance to become ready for ssh connections
+  wait_for:
+    timeout: 5
+  delegate_to: localhost
+  become: False
+  when: os_provisioned_instance is changed

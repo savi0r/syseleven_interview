@@ -1,0 +1,64 @@
+#jinja2: trim_blocks:False
+[DEFAULT]
+transport_url = rabbit://{{ rabbitmq_username}}:{{ rabbitmq_password }}@localhost:{{ services.rabbitmq.frontend_port }}
+log_dir = /var/log/nova
+lock_path = /var/lock/nova
+state_path = /var/lib/nova
+my_ip = {{ ansible_default_ipv4.address }}
+use_neutron = true
+firewall_driver = nova.virt.firewall.NoopFirewallDriver
+
+[api]
+auth_strategy = keystone
+
+[keystone_authtoken]
+auth_url = {{ openstack_endpoints.keystone.internal }}
+memcached_servers = {% for host in groups['controller'] %}{{ host }}:11211{{ "," if not loop.last else "" }}{% endfor %}
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = {{ openstack_credentials.nova.username }}
+password = {{ openstack_credentials.nova.password }}
+
+[glance]
+api_servers = {{ openstack_endpoints.glance.internal }}
+
+[oslo_concurrency]
+lock_path = /var/lib/nova/tmp
+
+[placement]
+region_name = {{ openstack_region_name }}
+project_domain_name = Default
+project_name = service
+auth_type = password
+user_domain_name = Default
+auth_url = {{ openstack_endpoints.keystone.internal }}
+username = {{ openstack_credentials.placement.username }}
+password = {{ openstack_credentials.placement.password }}
+
+[neutron]
+url = {{ openstack_endpoints.neutron.internal }}
+auth_url = {{ openstack_endpoints.keystone.internal }}
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+region_name = {{ openstack_region_name }}
+project_name = service
+username = {{ openstack_credentials.neutron.username }}
+password = {{ openstack_credentials.neutron.password }}
+
+[vnc]
+enabled = false
+
+[spice]
+agent_enabled = False
+enabled = True
+server_listen = {{ ansible_default_ipv4.address }}
+server_proxyclient_address = {{ ansible_default_ipv4.address }}
+
+[os_vif_ovs]
+ovsdb_connection="unix:/var/run/openvswitch/db.sock"
+
+[cinder]
+os_region_name = {{ openstack_region_name }}

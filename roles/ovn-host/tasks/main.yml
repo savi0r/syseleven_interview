@@ -1,0 +1,88 @@
+---
+
+- name: Install Open vSwitch and OVN host components
+  apt:
+    name:
+      - neutron-ovn-metadata-agent
+      - openvswitch-common
+      - openvswitch-switch
+      - ovn-common
+      - ovn-host
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+  register: fresh_install
+
+- name: Enable and start Open vSwitch switch and database services
+  systemd:
+    name: "openvswitch-switch.service"
+    enabled: True
+    state: started
+
+- name: Template ovn-host defaults file
+  template:
+    src: "ovn-host.j2"
+    dest: "/etc/default/ovn-host"
+  register: ovn_host
+
+- name: Ensure that ovn-host service is enabled
+  systemd:
+    name: ovn-host.service
+    enabled: True
+
+- name: Install neutron-ovn-metadata-agent configuration file
+  template:
+    src: "neutron_ovn_metadata_agent.ini.j2"
+    dest: "/etc/neutron/neutron_ovn_metadata_agent.ini"
+  register: neutron_ovn_metadata_config
+  when:
+    - 'not (extnet_gateway is defined and extnet_gateway == inventory_hostname)'
+    - fresh_install.changed
+
+- name: Restart neutron-ovn-metadata-agent service when needed
+  systemd:
+    name: neutron-ovn-metadata-agent.service
+    enabled: True
+    state: restarted
+  when:
+    - 'not (extnet_gateway is defined and extnet_gateway == inventory_hostname)'
+    - 'neutron_ovn_metadata_config.changed'
+
+- name: Configure common external-ids options
+  include_tasks: external_ids.yml
+  loop: "{{ external_ids_config_common }}"
+  loop_control:
+    loop_var: avpair
+
+- name: Configure gateway-related external-ids options
+  include_tasks: external_ids.yml
+  loop: "{{ external_ids_config_gateway }}"
+  loop_control:
+    loop_var: avpair
+  when: 'extnet_gateway is defined and extnet_gateway == inventory_hostname'
+
+- name: "Check if br-provider bridge exists"
+  command: >
+    ovs-vsctl br-exists br-provider
+  register: ovs_br
+  failed_when: ovs_br.rc != 0 and ovs_br.rc != 2
+  changed_when: False
+  check_mode: False
+
+- name: Restart ovn-host when needed
+  systemd:
+    name: ovn-host.service
+    state: restarted
+  when: ovn_host.changed
+
+- name: "Add br-provider to ovs"
+  shell: >
+    ovs-vsctl --may-exist add-br br-provider -- set bridge br-provider protocols=OpenFlow13
+  when: ovs_br.rc == 2
+
+- name: "Add provider port to br-provider bridge"
+  openvswitch_port:
+    bridge: "br-provider"
+    port: "extnet_veth_b"
+    state: present

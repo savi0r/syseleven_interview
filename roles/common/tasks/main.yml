@@ -1,0 +1,82 @@
+---
+
+- name: Generate hosts file
+  template:
+    src: "hosts.j2"
+    dest: "/etc/hosts"
+
+- name: Create directory for cloud credentials
+  file:
+    path: "/etc/openstack"
+    state: directory
+
+- name: Template credential files
+  template:
+    src: "{{ item }}.j2"
+    dest: "/etc/openstack/{{ item }}"
+  loop:
+    - "admin-openrc.sh"
+    - "clouds.yaml"
+
+- name: Install ubuntu cloud keyring
+  apt:
+    name: ubuntu-cloud-keyring
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Add OpenStack Ussuri repository
+  apt_repository:
+    repo: "deb http://ubuntu-cloud.archive.canonical.com/ubuntu bionic-updates/ussuri main"
+    state: present
+    update_cache: True
+
+- name: Perform full upgrade of an operating system
+  apt:
+    upgrade: dist
+    update_cache: True
+    cache_valid_time: 3600
+    autoclean: True
+    autoremove: True
+    force_apt_get: True
+
+- name: Install common packages
+  apt:
+    name:
+      - acl
+      - chrony
+      - net-tools
+      - python3-keystoneclient
+      - python3-neutronclient
+      - python3-novaclient
+      - python3-openstackclient
+      - python3-openstacksdk
+      - software-properties-common
+      - unzip
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Install extnet-routes.service
+  template:
+    src: "extnet-routes.service.j2"
+    dest: "/etc/systemd/system/extnet-routes.service"
+  register: routes_service
+
+- name: Ensure that extnet-routes.service is enabled
+  systemd:
+    name: extnet-routes.service
+    enabled: True
+
+- name: Reload systemd when necessary
+  systemd:
+    daemon_reload: True
+  when: routes_service.changed
+
+- name: Restart extnet-routes.service when necessary
+  systemd:
+    name: extnet-routes.service
+    state: restarted
+  when: routes_service.changed

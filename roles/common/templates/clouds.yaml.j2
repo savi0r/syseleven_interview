@@ -1,0 +1,13 @@
+clouds:
+  "{{ openstack_cloud_name }}":
+    region_name: "{{ openstack_region_name }}"
+    identity_api_version: 3
+    auth:
+      username: "{{ openstack_credentials.admin.username }}"
+      password: "{{ openstack_credentials.admin.password }}"
+      auth_url: "{{ openstack_endpoints.keystone.admin }}"
+      project_name: admin
+      user_domain_id: default
+      user_domain_name: default
+      project_domain_name: default
+      project_domain_id: default

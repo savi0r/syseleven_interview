@@ -1,0 +1,107 @@
+---
+
+- name: Install HAProxy
+  apt:
+    name: haproxy
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Check if Consul is installed
+  stat:
+    path: "/usr/local/bin/consul"
+  register: consul
+
+- name: Install Consul
+  when: not consul.stat.exists
+  block:
+    - name: Download and extract Consul
+      unarchive:
+        src: "https://releases.hashicorp.com/consul/1.6.1/consul_1.6.1_linux_amd64.zip"
+        dest: "/usr/local/bin"
+        remote_src: True
+    - name: Set mode for Consul
+      file:
+        dest: "/usr/local/bin/consul"
+
+
+- name: Install Consul systemd service
+  copy:
+    src: "consul.service"
+    dest: "/etc/systemd/system/consul.service"
+  register: consul_systemd_unit
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: True
+  when: consul_systemd_unit.changed
+
+- name: Create Consul configuration directory
+  file:
+    dest: "/etc/consul.d"
+    state: directory
+
+- name: Install Consul configuration
+  copy:
+    content: "{{ item.configuration | to_json }}"
+    dest: "/etc/consul.d/{{ item.name }}.json"
+  loop: "{{ consul_configuration }}"
+  register: consul_handler_configuration
+
+- name: Restart Consul
+  systemd:
+    name: consul
+    state: restarted
+  when: consul_handler_configuration.changed
+
+- name: Check if Consul-Template is installed
+  stat:
+    path: "/usr/local/bin/consul-template"
+  register: consul_template
+
+- name: Install Consul-Template
+  when: not consul_template.stat.exists
+  block:
+    - name: Download and extract Consul-Template
+      unarchive:
+        src: "https://releases.hashicorp.com/consul-template/0.22.0/consul-template_0.22.0_linux_amd64.tgz"
+        dest: "/usr/local/bin"
+        remote_src: True
+    - name: Set mode for Consul-Template
+      file:
+        dest: "/usr/local/bin/consul-template"
+
+- name: Create Consul-Template configuration directory
+  file:
+    path: "/etc/consul-template.d"
+    state: directory
+
+- name: Populate Consul-Template configuration file
+  template:
+    src: "config.hcl.j2"
+    dest: "/etc/consul-template.d/config.hcl"
+  register: consul_template_config
+
+- name: Populate HAProxy template
+  template:
+    src: "haproxy.cfg.ctmpl.j2"
+    dest: "/etc/consul-template.d/haproxy.cfg.ctmpl"
+  register: haproxy_config_template
+
+- name: Install Consul-Template systemd service
+  copy:
+    src: "consul-template.service"
+    dest: "/etc/systemd/system/consul-template.service"
+  register: consul_template_systemd_unit
+
+- name: Reload systemd
+  systemd:
+    daemon_reload: True
+  when: consul_template_systemd_unit.changed
+
+- name: Restart Consul-Template
+  systemd:
+    name: consul-template
+    state: restarted
+  when: consul_template_config.changed or haproxy_config_template.changed

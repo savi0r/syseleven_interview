@@ -1,0 +1,42 @@
+---
+
+- name: Perform full upgrade of an operating system
+  become: True
+  apt:
+    upgrade: dist
+    update_cache: True
+    cache_valid_time: 3600
+    autoclean: True
+    autoremove: True
+    force_apt_get: True
+
+- name: Check if reboot is required
+  stat:
+    path: /var/run/reboot-required
+  register: reboot_required
+
+- name: Reboot instance
+  shell: "sleep 2 && sudo /sbin/shutdown -r now"
+  async: 1
+  poll: 0
+  ignore_errors: True
+  when: reboot_required.stat.exists
+
+- name: Give 30 seconds for instance to reboot before checking if it is alive again
+  wait_for:
+    timeout: 30
+  delegate_to: localhost
+  when: reboot_required.stat.exists
+
+- name: Wait for ssh to become active on provisioned instance
+  wait_for:
+    port: "{{ ansible_port | default(22) }}"
+    host: "{{ ansible_host }}"
+  delegate_to: localhost
+  when: reboot_required.stat.exists
+
+- name: Give 5 seconds for instance to become ready for ssh connections
+  wait_for:
+    timeout: 5
+  delegate_to: localhost
+  when: reboot_required.stat.exists

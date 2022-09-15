@@ -1,0 +1,24 @@
+---
+
+- name: Install memcached packages
+  apt:
+    name:
+      - memcached
+      # - python3-memcache
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Enable remote access to memcached
+  lineinfile:
+    path: "/etc/memcached.conf"
+    regexp: "^-l"
+    line: "-l 0.0.0.0"
+  register: memcached_configuration
+
+- name: Restart memcached
+  systemd:
+    name: memcached
+    state: restarted
+  when: memcached_configuration.changed

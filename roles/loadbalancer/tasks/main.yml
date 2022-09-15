@@ -1,0 +1,45 @@
+---
+
+- name: Install nginx
+  apt:
+    name: nginx
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Disable default nginx site
+  file:
+    path: "/etc/nginx/sites-enabled/default"
+    state: absent
+  register: nginx_default_site
+
+- name: Setup virtual sites
+  copy:
+    content: |
+      server {
+        listen {{ item.value.bind_port }};
+        listen [::]:{{ item.value.bind_port }};
+        server_name {{ item.value.endpoint }};
+        client_max_body_size 0;
+        location / {
+          proxy_pass http://localhost:{{ item.value.local_port }}/;
+        }
+      }
+    dest: "/etc/nginx/sites-available/{{ item.key }}"
+  loop: "{{ loadbalancer_endpoints|dict2items }}"
+  register: nginx_virtual_sites
+
+- name: Enable virtual sites
+  file:
+    src: "/etc/nginx/sites-available/{{ item.key }}"
+    dest: "/etc/nginx/sites-enabled/{{ item.key }}"
+    state: link
+  loop: "{{ loadbalancer_endpoints|dict2items }}"
+  register: nginx_enabled_sites
+
+- name: Reload nginx
+  systemd:
+    name: nginx
+    state: reloaded
+  when: nginx_default_site.changed or nginx_virtual_sites.changed or nginx_enabled_sites.changed

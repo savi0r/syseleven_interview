@@ -1,0 +1,124 @@
+---
+
+- name: Install glance packages
+  apt:
+    name:
+      - glance
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+  register: glance_fresh_install
+
+- name: Setup glance-api.conf
+  template:
+    src: "glance-api.conf.j2"
+    dest: "/etc/glance/glance-api.conf"
+  register: glance_configuration
+
+- name: Create glance database user
+  mysql_user:
+    name: "{{ database_credentials.glance.username }}"
+    host: "%"
+    password: "{{ database_credentials.glance.password }}"
+    priv: "{{ database_credentials.glance.dbname }}.*:ALL,GRANT"
+    login_unix_socket: "/var/run/mysqld/mysqld.sock"
+    state: present
+  run_once: True
+  when:
+    - glance_fresh_install.changed
+
+- name: Create glance database
+  mysql_db:
+    login_host: localhost
+    login_port: 6033
+    login_user: "{{ database_credentials.glance.username }}"
+    login_password: "{{ database_credentials.glance.password }}"
+    name: "{{ database_credentials.glance.dbname }}"
+    state: present
+  run_once: True
+  register: glance_database
+  when:
+    - glance_fresh_install.changed
+
+- name: Populate glance database
+  become_user: glance
+  command: /usr/bin/glance-manage db_sync
+  run_once: True
+  when:
+    - glance_database.changed
+
+- name: Create glance OpenStack service user
+  os_user:
+    cloud: "{{ openstack_cloud_name }}"
+    region_name: "{{ openstack_region_name }}"
+    name: "{{ openstack_credentials.glance.username }}"
+    password: "{{ openstack_credentials.glance.password }}"
+    domain: default
+    default_project: service
+  run_once: True
+
+- name: Set admin role for glance user in service project
+  os_user_role:
+    cloud: "{{ openstack_cloud_name }}"
+    user: "{{ openstack_credentials.glance.username }}"
+    role: admin
+    project: service
+  run_once: True
+
+- name: Create glance service entry
+  os_keystone_service:
+    cloud: "{{ openstack_cloud_name }}"
+    state: present
+    name: glance
+    service_type: image
+    description: "Image Service"
+  run_once: True
+
+- name: Create public service endpoint for glance
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: glance
+    endpoint_interface: public
+    url: "{{ openstack_endpoints.glance.public }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create internal service endpoint for glance
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: glance
+    endpoint_interface: internal
+    url: "{{ openstack_endpoints.glance.internal }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create admin service endpoint for glance
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: glance
+    endpoint_interface: admin
+    url: "{{ openstack_endpoints.glance.admin }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Restart glance-api
+  systemd:
+    name: glance-api.service
+    state: restarted
+  when: glance_configuration.changed
+
+- name: Install glance Consul service
+  copy:
+    src: "glance-service.json"
+    dest: "/etc/consul.d/glance-service.json"
+  register: glance_consul_service
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: glance_consul_service.changed

@@ -1,0 +1,14 @@
+[Unit]
+Description=Consul Template
+StartLimitIntervalSec=0
+
+[Service]
+User=root
+Restart=always
+RestartSec=5
+ExecStart=/usr/local/bin/consul-template -config=/etc/consul-template.d/config.hcl
+KillMode=process
+KillSignal=9
+
+[Install]
+WantedBy=multi-user.target

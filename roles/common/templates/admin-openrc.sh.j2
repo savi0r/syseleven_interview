@@ -1,0 +1,8 @@
+export OS_AUTH_URL="{{ openstack_endpoints.keystone.admin }}"
+export OS_IDENTITY_API_VERSION=3
+export OS_PASSWORD="{{ openstack_credentials.admin.password }}"
+export OS_PROJECT_DOMAIN_NAME=Default
+export OS_PROJECT_NAME=admin
+export OS_REGION_NAME="{{ openstack_region_name }}"
+export OS_USER_DOMAIN_NAME=Default
+export OS_USERNAME="{{ openstack_credentials.admin.username }}"

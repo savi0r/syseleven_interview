@@ -1,0 +1,32 @@
+---
+
+- name: Get list of available OpenStack images
+  os_image_info:
+  connection: local
+  delegate_to: localhost
+  become: False
+  register: images
+
+- name: Get list of all images
+  set_fact:
+    openstack_selected_images: "{{ images.openstack_image }}"
+
+- name: Apply image constrains (check if values are defined)
+  set_fact:
+    openstack_selected_images: "{{ openstack_selected_images | selectattr(constrain.field, 'defined') | list }}"
+  loop: "{{ openstack_image_constrains }}"
+  loop_control:
+    loop_var: constrain
+  when: openstack_image_constrains is defined
+
+- name: Apply image constrains (check if values do match)
+  set_fact:
+    openstack_selected_images: "{{ openstack_selected_images | selectattr(constrain.field, constrain.operation, constrain.value) | list }}"
+  loop: "{{ openstack_image_constrains }}"
+  loop_control:
+    loop_var: constrain
+  when: openstack_image_constrains is defined
+
+- name: Sort image list by creation date
+  set_fact:
+    openstack_selected_images: "{{ openstack_selected_images | sort(attribute='created_at', reverse=True) }}"

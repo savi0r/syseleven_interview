@@ -1,0 +1,15 @@
+---
+
+- name: Stop MariaDB server
+  systemd:
+    name: mariadb
+    state: stopped
+
+- name: Bootstrap Galera on one random node
+  command: "/usr/bin/galera_new_cluster"
+  run_once: True
+
+- name: Start MariaDB server
+  systemd:
+    name: mariadb
+    state: started

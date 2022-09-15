@@ -1,0 +1,132 @@
+---
+
+- name: Install neutron packages
+  apt:
+    name:
+      - neutron-plugin-ml2
+      - neutron-server
+      - python3-setuptools
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Create neutron database user
+  mysql_user:
+    name: "{{ database_credentials.neutron.username }}"
+    host: "%"
+    password: "{{ database_credentials.neutron.password }}"
+    priv: "{{ database_credentials.neutron.dbname }}.*:ALL,GRANT"
+    login_unix_socket: "/var/run/mysqld/mysqld.sock"
+    state: present
+  run_once: True
+
+- name: Create neutron database
+  mysql_db:
+    login_host: localhost
+    login_port: "6033"
+    login_user: "{{ database_credentials.neutron.username }}"
+    login_password: "{{ database_credentials.neutron.password }}"
+    name: "{{ database_credentials.neutron.dbname }}"
+    state: present
+  run_once: True
+  register: neutron_database
+
+- name: Install neutron configuration file
+  template:
+    src: "neutron.conf.j2"
+    dest: "/etc/neutron/neutron.conf"
+  register: neutron_config
+
+- name: Install neutron ml2 plugin configuration file
+  template:
+    src: "ml2_conf.ini.j2"
+    dest: "/etc/neutron/plugins/ml2/ml2_conf.ini"
+  register: ml2_config
+
+- name: Populate neutron database
+  become_user: neutron
+  shell: >
+    neutron-db-manage --config-file /etc/neutron/neutron.conf --config-file /etc/neutron/plugins/ml2/ml2_conf.ini upgrade head
+  when: neutron_database.changed or neutron_config.changed or ml2_config.changed
+  run_once: True
+
+- name: Create neutron OpenStack service user
+  os_user:
+    cloud: "{{ openstack_cloud_name }}"
+    region_name: "{{ openstack_region_name }}"
+    name: "{{ openstack_credentials.neutron.username }}"
+    password: "{{ openstack_credentials.neutron.password }}"
+    domain: default
+    default_project: service
+  run_once: True
+
+- name: Set admin role for neutron user in service project
+  os_user_role:
+    cloud: "{{ openstack_cloud_name }}"
+    user: "{{ openstack_credentials.neutron.username }}"
+    role: admin
+    project: service
+  run_once: True
+
+- name: Create neutron service entry
+  os_keystone_service:
+    cloud: "{{ openstack_cloud_name }}"
+    state: present
+    name: neutron
+    service_type: network
+    description: "Network Service"
+  run_once: True
+
+- name: Create public service endpoint for neutron
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: neutron
+    endpoint_interface: public
+    url: "{{ openstack_endpoints.neutron.public }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create internal service endpoint for neutron
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: neutron
+    endpoint_interface: internal
+    url: "{{ openstack_endpoints.neutron.internal }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create admin service endpoint for neutron
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: neutron
+    endpoint_interface: admin
+    url: "{{ openstack_endpoints.neutron.admin }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Wait a bit for database to work properly
+  pause:
+    seconds: 15
+  when: neutron_database.changed or neutron_config.changed or ml2_config.changed
+
+- name: Restart neutron service
+  systemd:
+    name: neutron-server.service
+    state: restarted
+  when: neutron_config.changed or ml2_config.changed
+
+- name: Install neutron Consul service
+  copy:
+    src: "neutron-service.json"
+    dest: "/etc/consul.d/neutron-service.json"
+  register: neutron_consul_service
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: neutron_consul_service.changed

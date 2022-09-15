@@ -1,0 +1,124 @@
+---
+
+- name: Install cinder packages
+  apt:
+    name:
+      - cinder-api
+      - cinder-scheduler
+      - cinder-volume
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Setup cinder.conf
+  template:
+    src: "cinder.conf.j2"
+    dest: "/etc/cinder/cinder.conf"
+  register: cinder_configuration
+
+- name: Setup glusterfs.conf
+  template:
+    src: "glusterfs.conf.j2"
+    dest: "/etc/cinder/glusterfs.conf"
+  register: cinder_gluster_configuration
+
+- name: Create cinder database user
+  mysql_user:
+    name: "{{ database_credentials.cinder.username }}"
+    host: "%"
+    password: "{{ database_credentials.cinder.password }}"
+    priv: "{{ database_credentials.cinder.dbname }}.*:ALL,GRANT"
+    login_unix_socket: "/var/run/mysqld/mysqld.sock"
+    state: present
+  run_once: True
+
+- name: Create cinder database
+  mysql_db:
+    login_host: localhost
+    login_port: 6033
+    login_user: "{{ database_credentials.cinder.username }}"
+    login_password: "{{ database_credentials.cinder.password }}"
+    name: "{{ database_credentials.cinder.dbname }}"
+    state: present
+  run_once: True
+  register: cinder_database
+
+- name: Create cinder OpenStack service user
+  os_user:
+    cloud: "{{ openstack_cloud_name }}"
+    region_name: "{{ openstack_region_name }}"
+    name: "{{ openstack_credentials.cinder.username }}"
+    password: "{{ openstack_credentials.cinder.password }}"
+    domain: default
+    default_project: service
+  run_once: True
+
+- name: Set admin role for cinder user in service project
+  os_user_role:
+    cloud: "{{ openstack_cloud_name }}"
+    user: "{{ openstack_credentials.cinder.username }}"
+    role: admin
+    project: service
+  run_once: True
+
+- name: Create cinder service entry
+  os_keystone_service:
+    cloud: "{{ openstack_cloud_name }}"
+    state: present
+    name: cinder
+    service_type: cinder
+    description: "cinder Service"
+  run_once: True
+
+- name: Create public service endpoint for cinder
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: cinder
+    endpoint_interface: public
+    url: "{{ openstack_endpoints.cinder.public }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create internal service endpoint for cinder
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: cinder
+    endpoint_interface: internal
+    url: "{{ openstack_endpoints.cinder.internal }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create admin service endpoint for cinder
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: cinder
+    endpoint_interface: admin
+    url: "{{ openstack_endpoints.cinder.admin }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Restart cinder service
+  systemd:
+    name: "{{ item }}"
+    state: restarted
+  loop:
+    - cinder-api
+    - cinder-scheduler
+    - cinder-volume
+  when: cinder_configuration.changed or cinder_gluster_configuration.changed
+
+- name: Install cinder Consul service
+  copy:
+    src: "cinder-service.json"
+    dest: "/etc/consul.d/cinder-service.json"
+  register: cinder_consul_service
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: cinder_consul_service.changed

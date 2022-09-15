@@ -1,0 +1,70 @@
+---
+
+loadbalancer_endpoints:
+
+  keystone:
+    endpoint: "auth.openstack-lab.local"
+    bind_port: "{{ services.keystone.backend_port }}"
+    local_port: "{{ services.keystone.frontend_port }}"
+
+  glance:
+    endpoint: "api.openstack-lab.local"
+    bind_port: "{{ services.glance.backend_port }}"
+    local_port: "{{ services.glance.frontend_port }}"
+
+  placement:
+    endpoint: "api.openstack-lab.local"
+    bind_port: "{{ services.placement.backend_port }}"
+    local_port: "{{ services.placement.frontend_port }}"
+
+  nova:
+    endpoint: "api.openstack-lab.local"
+    bind_port: "{{ services.nova.backend_port }}"
+    local_port: "{{ services.nova.frontend_port }}"
+
+  neutron:
+    endpoint: "api.openstack-lab.local"
+    bind_port: "{{ services.neutron.backend_port }}"
+    local_port: "{{ services.neutron.frontend_port }}"
+
+  horizon:
+    endpoint: "dashboard.openstack-lab.local"
+    bind_port: "{{ services.horizon.backend_port }}"
+    local_port: "{{ services.horizon.frontend_port }}"
+
+  cinder:
+    endpoint: "api.openstack-lab.local"
+    bind_port: "{{ services.cinder.backend_port }}"
+    local_port: "{{ services.cinder.frontend_port }}"
+
+openstack_endpoints:
+
+  keystone:
+    internal: "http://localhost:{{ services.keystone.frontend_port }}/v3"
+    admin: "http://localhost:{{ services.keystone.frontend_port }}/v3"
+    public: "http://{{ loadbalancer_endpoints.keystone.endpoint }}:{{ loadbalancer_endpoints.keystone.bind_port }}/v3"
+
+  glance:
+    internal: "http://localhost:{{ services.glance.frontend_port }}"
+    admin: "http://localhost:{{ services.glance.frontend_port }}"
+    public: "http://{{ loadbalancer_endpoints.glance.endpoint }}:{{ loadbalancer_endpoints.glance.bind_port }}"
+
+  placement:
+    internal: "http://localhost:{{ services.placement.frontend_port }}"
+    admin: "http://localhost:{{ services.placement.frontend_port }}"
+    public: "http://{{ loadbalancer_endpoints.placement.endpoint }}:{{ loadbalancer_endpoints.placement.bind_port }}"
+
+  nova:
+    internal: "http://localhost:{{ services.nova.frontend_port }}/v2.1"
+    admin: "http://localhost:{{ services.nova.frontend_port }}/v2.1"
+    public: "http://{{ loadbalancer_endpoints.nova.endpoint }}:{{ loadbalancer_endpoints.nova.bind_port }}/v2.1"
+
+  neutron:
+    internal: "http://localhost:{{ services.neutron.frontend_port }}"
+    admin: "http://localhost:{{ services.neutron.frontend_port }}"
+    public: "http://{{ loadbalancer_endpoints.neutron.endpoint }}:{{ loadbalancer_endpoints.neutron.bind_port }}"
+
+  cinder:
+      internal: "http://localhost:{{ services.cinder.frontend_port }}"
+      admin: "http://localhost:{{ services.cinder.frontend_port }}"
+      public: "http://{{ loadbalancer_endpoints.cinder.endpoint }}:{{ loadbalancer_endpoints.cinder.bind_port }}"

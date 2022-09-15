@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "nova",
+        "checks": [{
+            "id": "nova port check",
+            "http": "http://localhost:8774/",
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

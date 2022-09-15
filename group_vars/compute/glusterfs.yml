@@ -1,0 +1,10 @@
+---
+
+glusterfs_nodes: "{{ groups['compute'] }}"
+
+glusterfs_volumes:
+  - name: "instances"
+    path: "/var/lib/nova/instances"
+    cluster: "{{ glusterfs_nodes }}"
+    uid: 64060
+    gid: 64060

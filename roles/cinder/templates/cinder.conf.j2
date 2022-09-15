@@ -1,0 +1,28 @@
+#jinja2: trim_blocks:False
+[DEFAULT]
+transport_url = rabbit://{{ rabbitmq_username}}:{{ rabbitmq_password }}@localhost:{{ services.rabbitmq.frontend_port }}
+my_ip = {{ ansible_default_ipv4.address }}
+enabled_backends = glusterfs
+
+[cinder_database]
+connection = "mysql+pymysql://{{ database_credentials.cinder.username }}:{{ database_credentials.cinder.password }}@localhost:6033/{{ database_credentials.cinder.dbname }}"
+
+[api]
+auth_strategy = keystone
+
+[keystone_authtoken]
+auth_url = {{ openstack_endpoints.keystone.internal }}
+memcache_servers = {% for host in groups['controller'] %}{{ host }}:11211{{ "," if not loop.last else "" }}{% endfor %}
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = {{ openstack_credentials.cinder.username }}
+password = {{ openstack_credentials.cinder.password }}
+
+[oslo_concurrency]
+lock_path = /var/lib/cinder/tmp
+
+[glusterfs]
+volume_driver = cinder.volume.drivers.glusterfs.GlusterfsDriver
+glusterfs_shares_config = /etc/cinder/glusterfs.conf

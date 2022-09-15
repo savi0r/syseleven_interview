@@ -1,0 +1,24 @@
+#jinja2: trim_blocks:False
+[DEFAULT]
+
+[database]
+connection = "mysql+pymysql://{{ database_credentials.glance.username }}:{{ database_credentials.glance.password }}@localhost:6033/{{ database_credentials.glance.dbname }}"
+
+[keystone_authtoken]
+www_authenticate_uri = {{ openstack_endpoints.keystone.public }}
+auth_url = {{ openstack_endpoints.keystone.internal }}
+memcache_servers = {% for host in groups['controller'] %}{{ host }}:11211{{ "," if not loop.last else "" }}{% endfor %}
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = {{ openstack_credentials.glance.username }}
+password = {{ openstack_credentials.glance.password }}
+
+[paste_deploy]
+flavor = keystone
+
+[glance_store]
+stores = file,http
+default_store = file
+filesystem_store_datadir = /var/lib/glance/images/

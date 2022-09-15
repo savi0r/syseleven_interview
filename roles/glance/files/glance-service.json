@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "glance",
+        "checks": [{
+            "id": "glance port check",
+            "http": "http://localhost:9292/healthcheck",
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

@@ -1,0 +1,22 @@
+[ml2]
+mechanism_drivers = ovn
+type_drivers = local,flat,geneve
+tenant_network_types = geneve
+extension_drivers = port_security
+overlay_ip_version = 4
+
+[ml2_type_geneve]
+vni_ranges = 1:65536
+max_header_size = 38
+
+[securitygroup]
+enable_security_group = true
+
+[ovn]
+ovn_nb_connection = {% for host in groups['controller'] %}tcp:{{ hostvars[host].ansible_default_ipv4.address }}:6641{% if not loop.last %},{% endif %}{% endfor %}
+
+ovn_sb_connection = {% for host in groups['controller'] %}tcp:{{ hostvars[host].ansible_default_ipv4.address }}:6642{% if not loop.last %},{% endif %}{% endfor %}
+
+ovn_metadata_enabled = true
+enable_distributed_floating_ip = false
+ovn_l3_scheduler = leastloaded

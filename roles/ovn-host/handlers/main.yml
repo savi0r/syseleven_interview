@@ -1,0 +1,4 @@
+- name: restart ovn-host
+  systemd:
+    name: ovn-host.service
+    state: restarted

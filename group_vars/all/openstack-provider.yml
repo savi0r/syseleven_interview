@@ -1,0 +1,24 @@
+---
+
+# These variables are nothing to do with lab OpenStack deployment! They set
+# credentials to access existing OpenStack cloud in order to start lab virtual
+# machines, and set some other provider cloud options.
+
+openstack_instance_flavor: "m1.small"
+openstack_instance_key_name: "lab"
+openstack_instance_network: "lab"
+openstack_instance_security_groups: [ "lab" ]
+
+openstack_image_constrains:
+  - field: os_distro
+    operation: match
+    value: ubuntu
+  - field: os_version
+    operation: match
+    value: '20.04'
+
+openstack_instance_image: "{{ openstack_selected_images[0].id }}"
+
+openstack_instance_install_python: False
+openstack_instance_gather_facts: False
+openstack_instance_perform_full_upgrade: True

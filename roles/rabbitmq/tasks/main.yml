@@ -1,0 +1,70 @@
+---
+
+- name: Install RabbitMQ packages
+  apt:
+    name:
+      - rabbitmq-server
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Enable RabbitMQ plugins
+  rabbitmq_plugin:
+    names: "rabbitmq_management"
+    state: enabled
+  register: rabbitmq_plugins
+
+- name: Install RabbitMQ erlang cookie
+  copy:
+    content: |
+      {{ rabbitmq_erlang_cookie }}
+    dest: "/var/lib/rabbitmq/.erlang.cookie"
+    mode: 0600
+    owner: rabbitmq
+    group: rabbitmq
+  register: rabbitmq_erlang_cookie
+
+- name: Restart RabbitMQ
+  systemd:
+    name: rabbitmq-server
+    state: restarted
+  when: rabbitmq_plugins.changed or rabbitmq_erlang_cookie.changed
+
+- name: Get RabbitMQ cluster status
+  shell: >
+    rabbitmqctl cluster_status |
+    grep 'Running Nodes' -A 5 |
+    grep 'rabbit@' |
+    wc -l
+  register: cluster_status
+  ignore_errors: True
+  changed_when: False
+
+- name: Bootstrap rabbit
+  include_tasks: bootstrap.yml
+  when:
+    - cluster_status.failed or cluster_status.stdout|trim != "3" or (rabbitmq_force_bootstrap is defined and rabbitmq_force_bootstrap)
+
+- name: Create RabbitMQ user
+  rabbitmq_user:
+    user: "{{ rabbitmq_username }}"
+    password: "{{ rabbitmq_password }}"
+    vhost: /
+    configure_priv: .*
+    read_priv: .*
+    write_priv: .*
+    state: present
+  run_once: True
+
+- name: Install RabbitMQ Consul service
+  copy:
+    src: "rabbitmq-service.json"
+    dest: "/etc/consul.d/rabbitmq-service.json"
+  register: rabbitmq_consul_service
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: rabbitmq_consul_service.changed

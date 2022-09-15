@@ -1,0 +1,6 @@
+---
+
+- name: Install python for ansible
+  become: False
+  raw: "test -x /usr/bin/python || ( sudo apt-get -q update && sudo apt-get -y -q install python-minimal )"
+  changed_when: False

@@ -1,0 +1,57 @@
+---
+
+services:
+
+  rabbitmq:
+    frontend_port: 13701
+    backend_port: 5672
+    mode: tcp
+    consul_name: rabbitmq
+
+  keystone:
+    frontend_port: 13702
+    backend_port: 5000
+    mode: http
+    consul_name: keystone
+
+  glance:
+    frontend_port: 13703
+    backend_port: 9292
+    mode: http
+    consul_name: glance
+
+  placement:
+    frontend_port: 13704
+    backend_port: 8778
+    mode: http
+    consul_name: placement
+
+  nova:
+    frontend_port: 13705
+    backend_port: 8774
+    mode: http
+    consul_name: nova
+
+  neutron:
+    frontend_port: 13706
+    backend_port: 9696
+    mode: http
+    consul_name: neutron
+
+  horizon:
+    frontend_port: 13707
+    backend_port: 8088
+    mode: http
+    consul_name: horizon
+
+  metadata:
+    frontend_port: 13708
+    backend_port: 8775
+    mode: http
+    consul_name: metadata
+
+  cinder:
+    frontend_port: 13709
+    backend_port: 8776
+    mode: http
+    consul_name: cinder

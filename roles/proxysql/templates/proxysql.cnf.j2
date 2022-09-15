@@ -1,0 +1,116 @@
+#jinja2: trim_blocks:False
+datadir = "/var/lib/proxysql"
+
+admin_variables =
+{
+    admin_credentials = "root:root;cluster:cluster"
+    mysql_ifaces = "0.0.0.0:6032"
+    cluster_username = "{{ proxysql_cluster_username }}"
+    cluster_password = "{{ proxysql_cluster_password }}"
+    stats_credentials = "{{ proxysql_stats_username }}:{{ proxysql_stats_password }}"
+    web_enabled = true
+    web_port = 6080
+}
+
+mysql_variables =
+{
+    threads = 2
+    max_connections = 2048
+    interfaces = "0.0.0.0:6033"
+    monitor_username = "{{ proxysql_monitor_username }}"
+    monitor_password = "{{ proxysql_monitor_username }}"
+    autocommit_false_is_transaction = true
+}
+
+proxysql_servers =
+(
+{% for host in groups['controller'] %}    {
+        hostname = "{{ host }}"
+        port = 6032
+        comment = "{{ host.split('.')[0] }}"
+    }{% if not loop.last %},{% endif %}
+{% endfor %})
+
+mysql_galera_hostgroups =
+(
+    {
+        writer_hostgroup = 10
+        backup_writer_hostgroup = 20
+        reader_hostgroup = 30
+        offline_hostgroup = 9999
+        max_writers = 1
+        writer_is_also_reader = 1
+        max_transactions_behind = 30
+        active = 1
+    }
+)
+
+mysql_servers =
+(
+{% for host in groups['controller'] %}    {
+        address = "{{ host }}"
+        port = 3306
+        hostgroup = 10
+        max_connections = 1024
+    }{% if not loop.last %},{% endif %}
+{% endfor %})
+
+mysql_query_rules =
+(
+    {
+        rule_id = 10
+        active = 1
+        match_pattern = "^SAVEPOINT"
+        destination_hostgroup = 10
+        apply = 1
+        multiplex = 0
+    },
+    {
+        rule_id = 20
+        active = 1
+        match_pattern = "^COMMIT"
+        destination_hostgroup = 10
+        apply = 1
+        multiplex = 1
+    },
+    {
+        rule_id = 30
+        active = 1
+        match_pattern = "^ROLLBACK$"
+        destination_hostgroup = 10
+        apply = 1
+        multiplex = 1
+    },
+    {
+        rule_id = 40
+        active = 1
+        match_pattern = "^SELECT .* FOR UPDATE"
+        destination_hostgroup = 10
+        apply = 1
+    },
+    {
+        rule_id = 50
+        active = 1
+        match_pattern = "^SELECT .*"
+        destination_hostgroup = 20
+        apply = 1
+    },
+    {
+        rule_id = 60
+        active = 1
+        match_pattern = ".*"
+        destination_hostgroup = 10
+        apply = 1
+    }
+)
+
+mysql_users =
+(
+{% for k,v in database_credentials.items() %}    {
+        username = "{{ v['username'] }}"
+        password = "{{ v['password'] }}"
+        default_hostgroup = 10
+        transaction_persistent = 1
+        active = 1
+    }{% if not loop.last %},{% endif %}
+{% endfor %})

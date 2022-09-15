@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "metadata",
+        "checks": [{
+            "id": "metadata port check",
+            "http": "http://localhost:8775/",
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

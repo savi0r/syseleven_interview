@@ -1,0 +1,118 @@
+---
+
+- name: Install placement packages
+  apt:
+    name:
+      - placement-api
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Setup placement.conf
+  template:
+    src: "placement.conf.j2"
+    dest: "/etc/placement/placement.conf"
+  register: placement_configuration
+
+- name: Create placement database user
+  mysql_user:
+    name: "{{ database_credentials.placement.username }}"
+    host: "%"
+    password: "{{ database_credentials.placement.password }}"
+    priv: "{{ database_credentials.placement.dbname }}.*:ALL,GRANT"
+    login_unix_socket: "/var/run/mysqld/mysqld.sock"
+    state: present
+  run_once: True
+
+- name: Create placement database
+  mysql_db:
+    login_host: localhost
+    login_port: 6033
+    login_user: "{{ database_credentials.placement.username }}"
+    login_password: "{{ database_credentials.placement.password }}"
+    name: "{{ database_credentials.placement.dbname }}"
+    state: present
+  run_once: True
+  register: placement_database
+
+- name: Populate placement database
+  become_user: placement
+  command: /usr/bin/placement-manage db sync
+  run_once: True
+  when: placement_database.changed
+
+- name: Create placement OpenStack service user
+  os_user:
+    cloud: "{{ openstack_cloud_name }}"
+    region_name: "{{ openstack_region_name }}"
+    name: "{{ openstack_credentials.placement.username }}"
+    password: "{{ openstack_credentials.placement.password }}"
+    domain: default
+    default_project: service
+  run_once: True
+
+- name: Set admin role for placement user in service project
+  os_user_role:
+    cloud: "{{ openstack_cloud_name }}"
+    user: "{{ openstack_credentials.placement.username }}"
+    role: admin
+    project: service
+  run_once: True
+
+- name: Create placement service entry
+  os_keystone_service:
+    cloud: "{{ openstack_cloud_name }}"
+    state: present
+    name: placement
+    service_type: placement
+    description: "Placement Service"
+  run_once: True
+
+- name: Create public service endpoint for placement
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: placement
+    endpoint_interface: public
+    url: "{{ openstack_endpoints.placement.public }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create internal service endpoint for placement
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: placement
+    endpoint_interface: internal
+    url: "{{ openstack_endpoints.placement.internal }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Create admin service endpoint for placement
+  os_keystone_endpoint:
+    cloud: "{{ openstack_cloud_name }}"
+    service: placement
+    endpoint_interface: admin
+    url: "{{ openstack_endpoints.placement.admin }}"
+    region: "{{ openstack_region_name }}"
+    state: present
+  run_once: True
+
+- name: Restart placement service
+  systemd:
+    name: apache2.service
+    state: restarted
+  when: placement_configuration.changed
+
+- name: Install placement Consul service
+  copy:
+    src: "placement-service.json"
+    dest: "/etc/consul.d/placement-service.json"
+  register: placement_consul_service
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: placement_consul_service.changed

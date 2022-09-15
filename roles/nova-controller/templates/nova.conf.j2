@@ -1,0 +1,69 @@
+#jinja2: trim_blocks:False
+[DEFAULT]
+transport_url = rabbit://{{ rabbitmq_username}}:{{ rabbitmq_password }}@localhost:{{ services.rabbitmq.frontend_port }}
+my_ip = {{ ansible_default_ipv4.address }}
+use_neutron = true
+metadata_listen = 0.0.0.0
+metadata_workers = 4
+
+[api_database]
+connection = mysql+pymysql://{{ database_credentials.nova.username }}:{{ database_credentials.nova.password }}@localhost:6033/{{ database_credentials.nova.dbname_api }}
+
+[database]
+connection = mysql+pymysql://{{ database_credentials.nova.username }}:{{ database_credentials.nova.password }}@localhost:6033/{{ database_credentials.nova.dbname }}
+
+[api]
+auth_strategy = keystone
+
+[keystone_authtoken]
+auth_url = {{ openstack_endpoints.keystone.internal }}
+memcached_servers = {% for host in groups['controller'] %}{{ host }}:11211{{ "," if not loop.last else "" }}{% endfor %}
+auth_type = password
+project_domain_name = Default
+user_domain_name = Default
+project_name = service
+username = {{ openstack_credentials.nova.username }}
+password = {{ openstack_credentials.nova.password }}
+
+[neutron]
+url = {{ openstack_endpoints.neutron.internal }}
+auth_url = {{ openstack_endpoints.keystone.internal }}
+auth_type = password
+project_domain_name = default
+user_domain_name = default
+region_name = {{ openstack_region_name }}
+project_name = service
+username = {{ openstack_credentials.neutron.username }}
+password = {{ openstack_credentials.neutron.password }}
+service_metadata_proxy = true
+metadata_proxy_shared_secret = {{ openstack_credentials.nova.metadata }}
+
+[vnc]
+enabled = false
+
+[spice]
+agent_enabled = False
+enabled = True
+html5proxy_host = 0.0.0.0
+html5proxy_port = 6082
+html5proxybaseurl = http://localhost:6082/spice_auto.html
+keymap = en-us
+
+[glance]
+api_servers = {{ openstack_endpoints.glance.internal }}
+
+[oslo_concurrency]
+lock_path = /var/lib/nova/tmp
+
+[placement]
+region_name = {{ openstack_region_name }}
+project_domain_name = Default
+project_name = service
+auth_type = password
+user_domain_name = Default
+auth_url = {{ openstack_endpoints.keystone.internal }}
+username = {{ openstack_credentials.placement.username }}
+password = {{ openstack_credentials.placement.password }}
+
+[scheduler]
+discover_hosts_in_cells_interval = 60

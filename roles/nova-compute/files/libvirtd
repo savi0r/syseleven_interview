@@ -1,0 +1,2 @@
+# Start libvirtd to handle qemu/kvm:
+start_libvirtd="yes"

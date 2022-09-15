@@ -1,0 +1,11 @@
+{
+    "service": {
+        "name": "placement",
+        "checks": [{
+            "id": "placement port check",
+            "http": "http://localhost:8778/",
+            "interval": "10s",
+            "timeout": "5s"
+        }]
+    }
+}

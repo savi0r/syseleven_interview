@@ -1,0 +1,58 @@
+---
+
+- name: Install horizon packages
+  apt:
+    name:
+      - openstack-dashboard
+    state: latest
+    update_cache: True
+    cache_valid_time: 3600
+    force_apt_get: True
+
+- name: Configure horizon
+  template:
+    src: "local_settings.py.j2"
+    dest: "/etc/openstack-dashboard/local_settings.py"
+  register: horizon_configuration
+
+- name: Deploy horizon apache2 site
+  template:
+    src: "horizon.conf.j2"
+    dest: "/etc/apache2/sites-available/horizon.conf"
+  register: horizon_apache2_site
+
+- name: Enable horizon apache2 site
+  file:
+    src: "/etc/apache2/sites-available/horizon.conf"
+    dest: "/etc/apache2/sites-enabled/horizon.conf"
+    state: link
+  register: horizon_apache2_enable_site
+
+- name: Disable apache2 horizon configuration
+  file:
+    path: "/etc/apache2/conf-enabled/openstack-dashboard.conf"
+    state: absent
+  register: apache2_default_site
+
+- name: Compress horizon assets
+  shell: >
+    python3 /usr/share/openstack-dashboard/manage.py compress
+  when: horizon_configuration.changed
+
+- name: Restart apache2
+  systemd:
+    name: apache2
+    state: restarted
+  when: horizon_configuration.changed or apache2_default_site.changed or horizon_apache2_site.changed or horizon_apache2_enable_site.changed
+
+- name: Install horizon Consul service
+  copy:
+    src: "horizon-service.json"
+    dest: "/etc/consul.d/horizon-service.json"
+  register: horizon_consul_service
+
+- name: Reload Consul
+  systemd:
+    name: consul
+    state: reloaded
+  when: horizon_consul_service.changed

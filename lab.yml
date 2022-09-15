@@ -1,0 +1,69 @@
+---
+
+# Provision all VMs in existing OpenStack Environment
+#
+# OpenStack OS_ variables must be set! Comment out this whole play if nodes
+# are provisioned elsewhere or bare metal servers are used in lab.
+- hosts: all
+  become: False
+  gather_facts: False
+  any_errors_fatal: True
+  roles:
+    - { role: openstack-select-image,  tags: [ "provision", "always" ] }
+    - { role: openstack-instance,      tags: [ "provision", "always" ] }
+
+# First we need to gather some facts from everything and run some common roles.
+- hosts: all
+  become: True
+  gather_facts: True
+  any_errors_fatal: True
+  roles:
+    - { role: common,                  tags: [ "common" ] }
+    - { role: cslb,                    tags: [ "cslb" ] }
+
+# Configure load balancer nodes
+- hosts: loadbalancer
+  become: True
+  gather_facts: True
+  any_errors_fatal: True
+  roles:
+    - { role: loadbalancer,            tags: [ "loadbalancer", "nginx" ] }
+
+# Configure controller nodes
+- hosts: controller
+  become: True
+  gather_facts: True
+  any_errors_fatal: True
+  roles:
+    - { role: galera,                  tags: [ "controller", "galera" ] }
+    - { role: proxysql,                tags: [ "controller", "proxysql" ] }
+    - { role: rabbitmq,                tags: [ "controller", "rabbitmq" ] }
+    - { role: memcached,               tags: [ "controller", "memcached" ] }
+    - { role: keystone,                tags: [ "controller", "keystone" ] }
+    - { role: glusterfs,               tags: [ "controller", "glusterfs" ] }
+    - { role: glance,                  tags: [ "controller", "glance" ] }
+    - { role: placement,               tags: [ "controller", "placement" ] }
+    - { role: nova-controller,         tags: [ "controller", "nova" ] }
+    - { role: ovn-central,             tags: [ "controller", "ovn" ] }
+    - { role: neutron,                 tags: [ "controller", "neutron" ] }
+    - { role: horizon,                 tags: [ "controller", "horizon" ] }
+    - { role: cinder,                 tags: [ "controller", "cinder" ] }
+
+# Configure compute nodes
+- hosts: compute
+  become: True
+  gather_facts: True
+  any_errors_fatal: True
+  roles:
+    - { role: glusterfs,               tags: [ "compute", "glusterfs" ] }
+    - { role: nova-compute,            tags: [ "compute", "nova" ] }
+    - { role: ovn-host,                tags: [ "compute", "ovn" ] }
+
+# Configure OVN gateway on the loadbalacner
+- hosts: loadbalancer
+  become: True
+  gather_facts: True
+  any_errors_fatal: True
+  roles:
+    - { role: external-net,            tags: [ "loadbalancer", "ovn" ] }
+    - { role: ovn-host,                tags: [ "loadbalancer", "ovn" ] }
